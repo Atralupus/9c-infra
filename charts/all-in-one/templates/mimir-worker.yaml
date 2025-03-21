@@ -1,0 +1,81 @@
+{{ if .Values.mimir.worker.diff.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mimir-diff-worker
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+  name: mimir-diff-worker
+  namespace: {{ $.Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mimir-diff-worker
+  template:
+    metadata:
+      labels:
+        app: mimir-diff-worker
+    spec:
+      containers:
+        - name: mimir-diff-worker
+          image: {{ $.Values.mimir.image.repository }}:{{ $.Values.mimir.image.tag }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: WORKER_Configuration__MongoDbConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: secrets-mimir
+                  key: mongodb_db_connection_string
+            - name: WORKER_Logging__LogLevel__System.Net.Http.HttpClient
+              value: "Warning"
+            - name: OpsConfig__JwtSecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: arena
+                  key: JWT_SECRET_KEY
+            - name: OpsConfig__JwtPublicKey
+              valueFrom:
+                secretKeyRef:
+                  name: arena
+                  key: JWT_PUBLIC_KEY
+            - name: OpsConfig__HangfireUsername
+              valueFrom:
+                secretKeyRef:
+                  name: arena
+                  key: HANGFIRE_USER_NAME
+            - name: OpsConfig__HangfirePassword
+              valueFrom:
+                secretKeyRef:
+                  name: arena
+                  key: HANGFIRE_PASSWORD
+            - name: Ssh__Enabled
+              value: "{{ .Values.arenaService.ssh.enabled }}"
+            - name: Ssh__Host
+              valueFrom:
+                secretKeyRef:
+                  name: arena
+                  key: SSH_HOST
+            - name: Ssh__Username
+              valueFrom:
+                secretKeyRef:
+                  name: arena
+                  key: SSH_USERNAME
+            - name: Ssh__Password
+              valueFrom:
+                secretKeyRef:
+                  name: arena
+                  key: SSH_PASSWORD
+
+          {{- with $.Values.mimir.worker.diff.env }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      restartPolicy: Always
+      {{- with $.Values.mimir.worker.diff.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  strategy:
+    type: RollingUpdate
+{{ end }}
